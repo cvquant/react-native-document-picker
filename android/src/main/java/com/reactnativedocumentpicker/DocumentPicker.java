@@ -1,11 +1,14 @@
 package com.reactnativedocumentpicker;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
@@ -106,16 +109,43 @@ public class DocumentPicker extends ReactContextBaseJavaModule implements Activi
     private WritableMap toMapWithMetadata(Uri uri) {
         WritableMap map;
         if(uri.toString().startsWith("/")) {
-            map = metaDataFromFile(new File(uri.toString()));
-        } else if (uri.toString().startsWith("http")) {
-            map = metaDataFromUri(uri);
-        } else {
-            map = metaDataFromContentResolver(uri);
-        }
-
-        map.putString("uri", uri.toString());
+          map = metaDataFromFile(new File(uri.toString()));
+          map.putString("uri", uri.toString());
+      } else if (uri.toString().startsWith("http")) {
+          map = metaDataFromUri(uri);
+          map.putString("uri", uri.toString());
+      } else {
+          map = metaDataFromContentResolver(uri);
+          map.putString("uri", getRealPathFromURI_API19(uri));
+          map.putString("contentUri", uri.toString());
+      }
 
         return map;
+    }
+
+    @SuppressLint("NewApi")
+    public String getRealPathFromURI_API19(Uri uri){
+        String filePath = "";
+        String wholeID = DocumentsContract.getDocumentId(uri);
+
+        // Split at colon, use second item in the array
+        String id = wholeID.split(":")[1];
+
+        String[] column = { MediaStore.Images.Media.DATA };
+
+        // where id is equal to
+        String sel = MediaStore.Images.Media._ID + "=?";
+
+        Cursor cursor = getReactApplicationContext().getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                column, sel, new String[]{ id }, null);
+
+        int columnIndex = cursor.getColumnIndex(column[0]);
+
+        if (cursor.moveToFirst()) {
+            filePath = cursor.getString(columnIndex);
+        }
+        cursor.close();
+        return filePath;
     }
 
     private WritableMap metaDataFromUri(Uri uri) {
